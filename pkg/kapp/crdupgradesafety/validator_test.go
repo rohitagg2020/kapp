@@ -7,8 +7,9 @@ import (
 	"errors"
 	"testing"
 
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	apiextensionsv1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
 )
 
 func TestValidator(t *testing.T) {
@@ -24,7 +25,7 @@ func TestValidator(t *testing.T) {
 		{
 			name: "passing validator, no error",
 			validations: []Validation{
-				NewValidationFunc("pass", func(_, _ v1.CustomResourceDefinition) error {
+				NewValidationFunc("pass", func(_, _ apiextensionsv1.CustomResourceDefinition) error {
 					return nil
 				}),
 			},
@@ -32,7 +33,7 @@ func TestValidator(t *testing.T) {
 		{
 			name: "failing validator, error",
 			validations: []Validation{
-				NewValidationFunc("fail", func(_, _ v1.CustomResourceDefinition) error {
+				NewValidationFunc("fail", func(_, _ apiextensionsv1.CustomResourceDefinition) error {
 					return errors.New("boom")
 				}),
 			},
@@ -41,10 +42,10 @@ func TestValidator(t *testing.T) {
 		{
 			name: "passing+failing validator, error",
 			validations: []Validation{
-				NewValidationFunc("pass", func(_, _ v1.CustomResourceDefinition) error {
+				NewValidationFunc("pass", func(_, _ apiextensionsv1.CustomResourceDefinition) error {
 					return nil
 				}),
-				NewValidationFunc("fail", func(_, _ v1.CustomResourceDefinition) error {
+				NewValidationFunc("fail", func(_, _ apiextensionsv1.CustomResourceDefinition) error {
 					return errors.New("boom")
 				}),
 			},
@@ -55,7 +56,7 @@ func TestValidator(t *testing.T) {
 			v := Validator{
 				Validations: tc.validations,
 			}
-			var o, n v1.CustomResourceDefinition
+			var o, n apiextensionsv1.CustomResourceDefinition
 
 			err := v.Validate(o, n)
 			require.Equal(t, tc.shouldErr, err != nil)
@@ -66,33 +67,33 @@ func TestValidator(t *testing.T) {
 func TestNoScopeChange(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		old         v1.CustomResourceDefinition
-		new         v1.CustomResourceDefinition
+		old         apiextensionsv1.CustomResourceDefinition
+		new         apiextensionsv1.CustomResourceDefinition
 		shouldError bool
 	}{
 		{
 			name: "no scope change, no error",
-			old: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Scope: v1.ClusterScoped,
+			old: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Scope: apiextensionsv1.ClusterScoped,
 				},
 			},
-			new: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Scope: v1.ClusterScoped,
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Scope: apiextensionsv1.ClusterScoped,
 				},
 			},
 		},
 		{
 			name: "scope change, error",
-			old: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Scope: v1.ClusterScoped,
+			old: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Scope: apiextensionsv1.ClusterScoped,
 				},
 			},
-			new: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Scope: v1.NamespaceScoped,
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Scope: apiextensionsv1.NamespaceScoped,
 				},
 			},
 			shouldError: true,
@@ -108,28 +109,28 @@ func TestNoScopeChange(t *testing.T) {
 func TestNoStoredVersionRemoved(t *testing.T) {
 	for _, tc := range []struct {
 		name        string
-		old         v1.CustomResourceDefinition
-		new         v1.CustomResourceDefinition
+		old         apiextensionsv1.CustomResourceDefinition
+		new         apiextensionsv1.CustomResourceDefinition
 		shouldError bool
 	}{
 		{
 			name: "no stored versions, no error",
-			new: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Versions: []v1.CustomResourceDefinitionVersion{
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 						{
 							Name: "v1alpha1",
 						},
 					},
 				},
 			},
-			old: v1.CustomResourceDefinition{},
+			old: apiextensionsv1.CustomResourceDefinition{},
 		},
 		{
 			name: "stored versions, no stored version removed, no error",
-			new: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Versions: []v1.CustomResourceDefinitionVersion{
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 						{
 							Name: "v1alpha1",
 						},
@@ -139,8 +140,8 @@ func TestNoStoredVersionRemoved(t *testing.T) {
 					},
 				},
 			},
-			old: v1.CustomResourceDefinition{
-				Status: v1.CustomResourceDefinitionStatus{
+			old: apiextensionsv1.CustomResourceDefinition{
+				Status: apiextensionsv1.CustomResourceDefinitionStatus{
 					StoredVersions: []string{
 						"v1alpha1",
 					},
@@ -149,17 +150,17 @@ func TestNoStoredVersionRemoved(t *testing.T) {
 		},
 		{
 			name: "stored versions, stored version removed, error",
-			new: v1.CustomResourceDefinition{
-				Spec: v1.CustomResourceDefinitionSpec{
-					Versions: []v1.CustomResourceDefinitionVersion{
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
 						{
 							Name: "v1alpha2",
 						},
 					},
 				},
 			},
-			old: v1.CustomResourceDefinition{
-				Status: v1.CustomResourceDefinitionStatus{
+			old: apiextensionsv1.CustomResourceDefinition{
+				Status: apiextensionsv1.CustomResourceDefinitionStatus{
 					StoredVersions: []string{
 						"v1alpha1",
 					},
@@ -171,6 +172,167 @@ func TestNoStoredVersionRemoved(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			err := NoStoredVersionRemoved(tc.old, tc.new)
 			require.Equal(t, tc.shouldError, err != nil)
+		})
+	}
+}
+
+func TestNoExistingFieldRemoved(t *testing.T) {
+	for _, tc := range []struct {
+		name        string
+		new         apiextensionsv1.CustomResourceDefinition
+		old         apiextensionsv1.CustomResourceDefinition
+		shouldError bool
+	}{
+		{
+			name: "no existing field removed, no error",
+			old: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+		{
+			name: "existing field removed, error",
+			old: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+										"fieldTwo": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			shouldError: true,
+		},
+		{
+			name: "new version is added with the field removed, no error",
+			old: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+										"fieldTwo": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			new: apiextensionsv1.CustomResourceDefinition{
+				Spec: apiextensionsv1.CustomResourceDefinitionSpec{
+					Versions: []apiextensionsv1.CustomResourceDefinitionVersion{
+						{
+							Name: "v1alpha1",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+										"fieldTwo": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+						{
+							Name: "v1alpha2",
+							Schema: &apiextensionsv1.CustomResourceValidation{
+								OpenAPIV3Schema: &apiextensionsv1.JSONSchemaProps{
+									Type: "object",
+									Properties: map[string]apiextensionsv1.JSONSchemaProps{
+										"fieldOne": {
+											Type: "string",
+										},
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			err := NoExistingFieldRemoved(tc.old, tc.new)
+			assert.Equal(t, tc.shouldError, err != nil)
 		})
 	}
 }
