@@ -37,6 +37,11 @@ func NewPreflight(df cmdcore.DepsFactory, enabled bool) *Preflight {
 				NewValidationFunc("NoScopeChange", NoScopeChange),
 				NewValidationFunc("NoStoredVersionRemoved", NoStoredVersionRemoved),
 				NewValidationFunc("NoExistingFieldRemoved", NoExistingFieldRemoved),
+				&ChangeValidator{
+					Validations: []ChangeValidation{
+						EnumChangeValidation,
+					},
+				},
 			},
 		},
 	}
