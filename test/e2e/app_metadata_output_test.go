@@ -55,10 +55,18 @@ metadata:
 	assert.NoError(t, err)
 	thirdDeploy, err := os.CreateTemp(os.TempDir(), "output3")
 	assert.NoError(t, err)
+	fourthDeploy, err := os.CreateTemp(os.TempDir(), "output4")
+	assert.NoError(t, err)
+
+	tmpDir, err := os.MkdirTemp("", "")
+	assert.NoError(t, err)
+	defer os.RemoveAll(tmpDir)
 
 	defer func() {
 		os.Remove(firstDeploy.Name())
 		os.Remove(secondDeploy.Name())
+		os.Remove(thirdDeploy.Name())
+		os.Remove(fourthDeploy.Name())
 	}()
 
 	logger.Section("deploy app", func() {
@@ -71,6 +79,10 @@ metadata:
 
 	logger.Section("deploy with no changes", func() {
 		kapp.RunWithOpts([]string{"deploy", "--app-metadata-file-output", thirdDeploy.Name(), "-f", "-", "-a", name}, RunOpts{IntoNs: true, StdinReader: strings.NewReader(yaml2)})
+	})
+
+	logger.Section("deploy with no changes", func() {
+		kapp.RunWithOpts([]string{"deploy", "--app-metadata-file-output", fourthDeploy.Name(), "-f", tmpDir, "-a", name, "--dangerous-allow-empty-list-of-resources"}, RunOpts{IntoNs: true})
 	})
 
 	configMapFirstDeploy, err := os.ReadFile(firstDeploy.Name())
@@ -93,4 +105,11 @@ metadata:
 	thirdConfigMap := yamlSubset{}
 	require.NoError(t, yaml.Unmarshal(configMapThirdDeploy, &thirdConfigMap))
 	require.Equal(t, yamlSubset{LastChange: lastChange{Namespaces: []string{env.Namespace}}, UsedGKs: []usedGK{{Group: "", Kind: "Secret"}}}, thirdConfigMap)
+
+	configMapFourthDeploy, err := os.ReadFile(fourthDeploy.Name())
+	assert.NoError(t, err)
+
+	fourthConfigMap := yamlSubset{}
+	require.NoError(t, yaml.Unmarshal(configMapFourthDeploy, &fourthConfigMap))
+	require.Equal(t, yamlSubset{LastChange: lastChange{Namespaces: nil}, UsedGKs: []usedGK{}}, fourthConfigMap)
 }

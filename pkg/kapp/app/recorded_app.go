@@ -105,8 +105,13 @@ func (a *RecordedApp) UpdateUsedGVsAndGKs(gvs []schema.GroupVersion, gks []schem
 		}
 	}
 
+	sort.Slice(uniqGVs, func(i int, j int) bool {
+		return uniqGVs[i].Group+uniqGVs[i].Version < uniqGVs[j].Group+uniqGVs[j].Version
+	})
+
 	gksByGK := map[schema.GroupKind]struct{}{}
-	var uniqGKs []schema.GroupKind
+	// Initialize with an empty slice so that we do not remove `usedGKs` from meta configmap
+	uniqGKs := []schema.GroupKind{}
 
 	for _, gk := range gks {
 		if _, found := gksByGK[gk]; !found {
@@ -114,10 +119,6 @@ func (a *RecordedApp) UpdateUsedGVsAndGKs(gvs []schema.GroupVersion, gks []schem
 			uniqGKs = append(uniqGKs, gk)
 		}
 	}
-
-	sort.Slice(uniqGVs, func(i int, j int) bool {
-		return uniqGVs[i].Group+uniqGVs[i].Version < uniqGVs[j].Group+uniqGVs[j].Version
-	})
 
 	sort.Slice(uniqGKs, func(i int, j int) bool {
 		return uniqGKs[i].Group+uniqGKs[i].Kind < uniqGKs[j].Group+uniqGKs[j].Kind
