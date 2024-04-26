@@ -71,6 +71,48 @@ func EnumChangeValidation(diff FieldDiff) (bool, error) {
 	return handled(), nil
 }
 
+// RequiredFieldChangeValidation adds a validation check to ensure that
+// existing required fields can be marked as optional in a CRD schema:
+// - No new values can be added as required that did not previously have
+// any required fields present
+// - Existing values can be removed from the required field
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to required field values)
+// - An error if either of the above criteria are not met
+func RequiredFieldChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.Required = []string{}
+		diff.New.Required = []string{}
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	if len(diff.Old.Required) == 0 && len(diff.New.Required) > 0 {
+		return handled(), fmt.Errorf("new values added as required when previously no required fields existed: %+v", diff.New.Required)
+	}
+
+	oldSet := sets.NewString()
+	for _, requiredField := range diff.Old.Required {
+		if !oldSet.Has(requiredField) {
+			oldSet.Insert(requiredField)
+		}
+	}
+
+	newSet := sets.NewString()
+	for _, requiredField := range diff.New.Required {
+		if !newSet.Has(requiredField) {
+			newSet.Insert(requiredField)
+		}
+	}
+
+	diffSet := newSet.Difference(oldSet)
+	if diffSet.Len() > 0 {
+		return handled(), fmt.Errorf("new required fields added: %+v", diffSet.UnsortedList())
+	}
+
+	return handled(), nil
+}
+
 // ChangeValidator is a Validation implementation focused on
 // handling updates to existing fields in a CRD
 type ChangeValidator struct {

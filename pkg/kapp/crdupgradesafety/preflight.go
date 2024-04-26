@@ -40,6 +40,7 @@ func NewPreflight(df cmdcore.DepsFactory, enabled bool) *Preflight {
 				&ChangeValidator{
 					Validations: []ChangeValidation{
 						EnumChangeValidation,
+						RequiredFieldChangeValidation,
 					},
 				},
 			},

@@ -429,3 +429,82 @@ func TestChangeValidator(t *testing.T) {
 		})
 	}
 }
+
+func TestRequiredFieldChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+				},
+				New: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "required field removed, no other changes, should be handled, no error",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Required: []string{"foo", "bar"},
+				},
+				New: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "new required field added, no other changes, should be handled, error",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+				},
+				New: &v1.JSONSchemaProps{
+					Required: []string{"foo", "bar"},
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no required field change, another field modified, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+					ID:       "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					Required: []string{"foo"},
+					ID:       "xyz",
+				},
+			},
+		},
+		{
+			name: "no required fields before, new required fields added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					Required: []string{"foo", "bar"},
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.RequiredFieldChangeValidation(tc.diff)
+			assert.Empty(t, tc.diff.Old.Required)
+			assert.Empty(t, tc.diff.New.Required)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+		})
+	}
+}
