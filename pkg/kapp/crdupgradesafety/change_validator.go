@@ -113,6 +113,134 @@ func RequiredFieldChangeValidation(diff FieldDiff) (bool, error) {
 	return handled(), nil
 }
 
+// MinimumChangeValidation adds a validation check to ensure that
+// existing fields can have their minimum constraints updated in a CRD schema
+// based on the following:
+// - No minimum constraint can be added if one did not exist previously
+// - Minimum constraints can not increase in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to minimum constraints)
+// - An error if either of the above criteria are not met
+func MinimumChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.Minimum = nil
+		diff.New.Minimum = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.Minimum == nil && diff.New.Minimum != nil:
+		m := *diff.New.Minimum
+		return handled(), fmt.Errorf("minimum constraint added when one did not exist previously: %+v", m)
+	case diff.Old.Minimum != nil && diff.New.Minimum != nil:
+		oldMin := *diff.Old.Minimum
+		newMin := *diff.New.Minimum
+		if oldMin < newMin {
+			return handled(), fmt.Errorf("minimum constraint increased from %+v to %+v", oldMin, newMin)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MinimumLengthChangeValidation adds a validation check to ensure that
+// existing fields can have their minimum length constraints updated in a CRD schema
+// based on the following:
+// - No minimum length constraint can be added if one did not exist previously
+// - Minimum length constraints can not increase in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to minimum length constraints)
+// - An error if either of the above criteria are not met
+func MinimumLengthChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MinLength = nil
+		diff.New.MinLength = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MinLength == nil && diff.New.MinLength != nil:
+		m := *diff.New.MinLength
+		return handled(), fmt.Errorf("minimum length constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MinLength != nil && diff.New.MinLength != nil:
+		oldMin := *diff.Old.MinLength
+		newMin := *diff.New.MinLength
+		if oldMin < newMin {
+			return handled(), fmt.Errorf("minimum length constraint increased from %+v to %+v", oldMin, newMin)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MinimumItemsChangeValidation adds a validation check to ensure that
+// existing fields can have their minimum item constraints updated in a CRD schema
+// based on the following:
+// - No minimum item constraint can be added if one did not exist previously
+// - Minimum item constraints can not increase in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to minimum item constraints)
+// - An error if either of the above criteria are not met
+func MinimumItemsChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MinItems = nil
+		diff.New.MinItems = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MinItems == nil && diff.New.MinItems != nil:
+		m := *diff.New.MinItems
+		return handled(), fmt.Errorf("minimum items constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MinItems != nil && diff.New.MinItems != nil:
+		oldMin := *diff.Old.MinItems
+		newMin := *diff.New.MinItems
+		if oldMin < newMin {
+			return handled(), fmt.Errorf("minimum items constraint increased from %+v to %+v", oldMin, newMin)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MinimumPropertiesChangeValidation adds a validation check to ensure that
+// existing fields can have their minimum properties constraints updated in a CRD schema
+// based on the following:
+// - No minimum properties constraint can be added if one did not exist previously
+// - Minimum properties constraints can not increase in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to minimum properties constraints)
+// - An error if either of the above criteria are not met
+func MinimumPropertiesChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MinProperties = nil
+		diff.New.MinProperties = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MinProperties == nil && diff.New.MinProperties != nil:
+		m := *diff.New.MinProperties
+		return handled(), fmt.Errorf("minimum properties constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MinProperties != nil && diff.New.MinProperties != nil:
+		oldMin := *diff.Old.MinProperties
+		newMin := *diff.New.MinProperties
+		if oldMin < newMin {
+			return handled(), fmt.Errorf("minimum properties constraint increased from %+v to %+v", oldMin, newMin)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
 // ChangeValidator is a Validation implementation focused on
 // handling updates to existing fields in a CRD
 type ChangeValidator struct {

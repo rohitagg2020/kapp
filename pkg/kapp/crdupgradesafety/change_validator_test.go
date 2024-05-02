@@ -10,6 +10,7 @@ import (
 	"carvel.dev/kapp/pkg/kapp/crdupgradesafety"
 	"github.com/stretchr/testify/assert"
 	v1 "k8s.io/apiextensions-apiserver/pkg/apis/apiextensions/v1"
+	"k8s.io/utils/pointer"
 )
 
 func TestEnumChangeValidation(t *testing.T) {
@@ -505,6 +506,362 @@ func TestRequiredFieldChangeValidation(t *testing.T) {
 			assert.Empty(t, tc.diff.New.Required)
 			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
 			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+		})
+	}
+}
+
+func TestMinimumChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum decreased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum increased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+				},
+				New: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no minimum before, minimum added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "minimum removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no minimum change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+					ID:      "bar",
+				},
+				New: &v1.JSONSchemaProps{
+					Minimum: pointer.Float64(8),
+					ID:      "baz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MinimumChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.Minimum)
+			assert.Empty(t, tc.diff.New.Minimum)
+		})
+	}
+}
+
+func TestMinimumLengthChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum length decreased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(8),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum length increased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(8),
+				},
+				New: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no minimum length before, minimum length added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "minimum length removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no minimum length change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+					ID:        "bar",
+				},
+				New: &v1.JSONSchemaProps{
+					MinLength: pointer.Int64(10),
+					ID:        "baz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MinimumLengthChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MinLength)
+			assert.Empty(t, tc.diff.New.MinLength)
+		})
+	}
+}
+
+func TestMinimumItemsChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum items decreased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(8),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum items increased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(8),
+				},
+				New: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no minimum items before, minimum items added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "minimum items removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no minimum items change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+					ID:       "bar",
+				},
+				New: &v1.JSONSchemaProps{
+					MinItems: pointer.Int64(10),
+					ID:       "baz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MinimumItemsChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MinItems)
+			assert.Empty(t, tc.diff.New.MinItems)
+		})
+	}
+}
+
+func TestMinimumPropertiesChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum properties decreased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(8),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "minimum properties increased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(8),
+				},
+				New: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no minimum properties before, minimum properties added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "minimum properties removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no minimum properties change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+					ID:            "bar",
+				},
+				New: &v1.JSONSchemaProps{
+					MinProperties: pointer.Int64(10),
+					ID:            "baz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MinimumPropertiesChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MinProperties)
+			assert.Empty(t, tc.diff.New.MinProperties)
 		})
 	}
 }

@@ -41,6 +41,10 @@ func NewPreflight(df cmdcore.DepsFactory, enabled bool) *Preflight {
 					Validations: []ChangeValidation{
 						EnumChangeValidation,
 						RequiredFieldChangeValidation,
+						MinimumChangeValidation,
+						MinimumItemsChangeValidation,
+						MinimumLengthChangeValidation,
+						MinimumPropertiesChangeValidation,
 					},
 				},
 			},
