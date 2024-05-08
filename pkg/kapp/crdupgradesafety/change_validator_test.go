@@ -1221,3 +1221,97 @@ func TestMaximumPropertiesChangeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestDefaultChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change in default value, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+				},
+				New: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no default before, default added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "existing default removed, no other changes, error, should be handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "default value changed, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+				},
+				New: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("bar"),
+					},
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no default value change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+					ID: "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					Default: &v1.JSON{
+						Raw: []byte("foo"),
+					},
+					ID: "xyz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.DefaultValueChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.Default)
+			assert.Empty(t, tc.diff.New.Default)
+		})
+	}
+}

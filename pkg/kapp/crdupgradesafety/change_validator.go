@@ -4,6 +4,7 @@
 package crdupgradesafety
 
 import (
+	"bytes"
 	"errors"
 	"fmt"
 	"reflect"
@@ -362,6 +363,44 @@ func MaximumPropertiesChangeValidation(diff FieldDiff) (bool, error) {
 		newMax := *diff.New.MaxProperties
 		if newMax < oldMax {
 			return handled(), fmt.Errorf("maximum properties constraint decreased from %+v to %+v", oldMax, newMax)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// DefaultValueChangeValidation adds a validation check to ensure that
+// default values are not changed in a CRD schema:
+// - No new value can be added as default that did not previously have a
+// default value present
+// - Default value of a field cannot be changed
+// - Existing default value for a field cannot be removed
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to a field's default value)
+// - An error if either of the above criteria are not met
+func DefaultValueChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.Default = &v1.JSON{}
+		diff.New.Default = &v1.JSON{}
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.Default == nil && diff.New.Default != nil:
+		newDefault := diff.New.Default
+		return handled(), fmt.Errorf("new value added as default when previously no default value existed: %+v", newDefault)
+
+	case diff.Old.Default != nil && diff.New.Default == nil:
+		oldDefault := diff.Old.Default.Raw
+		return handled(), fmt.Errorf("default value has been removed when previously a default value existed: %+v", oldDefault)
+
+	case diff.Old.Default != nil && diff.New.Default != nil:
+		oldDefault := diff.Old.Default.Raw
+		newDefault := diff.New.Default.Raw
+		if !bytes.Equal(diff.Old.Default.Raw, diff.New.Default.Raw) {
+			return handled(), fmt.Errorf("default value has been changed from %+v to %+v", oldDefault, newDefault)
 		}
 		fallthrough
 	default:

@@ -49,6 +49,7 @@ func NewPreflight(df cmdcore.DepsFactory, enabled bool) *Preflight {
 						MaximumLengthChangeValidation,
 						MaximumItemsChangeValidation,
 						MaximumPropertiesChangeValidation,
+						DefaultValueChangeValidation,
 					},
 				},
 			},
