@@ -865,3 +865,359 @@ func TestMinimumPropertiesChangeValidation(t *testing.T) {
 		})
 	}
 }
+
+func TestMaximumChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum increased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(100),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum decreased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(1),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no maximum before, maximum added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "maximum removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no maximum change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+					ID:      "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					Maximum: pointer.Float64(10),
+					ID:      "xyz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MaximumChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.Maximum)
+			assert.Empty(t, tc.diff.New.Maximum)
+		})
+	}
+}
+
+func TestMaximumLengthChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum length increased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(100),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum length decreased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(1),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no maximum length before, maximum length added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "maximum length removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no maximum length change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+					ID:        "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					MaxLength: pointer.Int64(10),
+					ID:        "xyz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MaximumLengthChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MaxLength)
+			assert.Empty(t, tc.diff.New.MaxLength)
+		})
+	}
+}
+
+func TestMaximumItemsChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum items increased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(100),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum items decreased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(1),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no maximum items before, maximum items added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "maximum items removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no maximum items change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+					ID:       "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					MaxItems: pointer.Int64(10),
+					ID:       "xyz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MaximumItemsChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MaxItems)
+			assert.Empty(t, tc.diff.New.MaxItems)
+		})
+	}
+}
+
+func TestMaximumPropertiesChangeValidation(t *testing.T) {
+	for _, tc := range []struct {
+		name         string
+		diff         crdupgradesafety.FieldDiff
+		shouldError  bool
+		shouldHandle bool
+	}{
+		{
+			name: "no change, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum properties increased, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(100),
+				},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "maximum properties decreased, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(1),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "no maximum properties before, maximum properties added, no other changes, error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{},
+				New: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+			},
+			shouldHandle: true,
+			shouldError:  true,
+		},
+		{
+			name: "maximum properties removed, no other changes, no error, marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+				},
+				New: &v1.JSONSchemaProps{},
+			},
+			shouldHandle: true,
+		},
+		{
+			name: "no maximum properties change, other changes, no error, not marked as handled",
+			diff: crdupgradesafety.FieldDiff{
+				Old: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+					ID:            "abc",
+				},
+				New: &v1.JSONSchemaProps{
+					MaxProperties: pointer.Int64(10),
+					ID:            "xyz",
+				},
+			},
+		},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			handled, err := crdupgradesafety.MaximumPropertiesChangeValidation(tc.diff)
+			assert.Equal(t, tc.shouldError, err != nil, "should error? - %v", tc.shouldError)
+			assert.Equal(t, tc.shouldHandle, handled, "should be handled? - %v", tc.shouldHandle)
+			assert.Empty(t, tc.diff.Old.MaxProperties)
+			assert.Empty(t, tc.diff.New.MaxProperties)
+		})
+	}
+}

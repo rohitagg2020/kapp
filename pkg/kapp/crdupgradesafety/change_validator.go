@@ -241,6 +241,134 @@ func MinimumPropertiesChangeValidation(diff FieldDiff) (bool, error) {
 	}
 }
 
+// MaximumChangeValidation adds a validation check to ensure that
+// existing fields can have their maximum constraints updated in a CRD schema
+// based on the following:
+// - No maximum constraint can be added if one did not exist previously
+// - Maximum constraints can not decrease in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to maximum constraints)
+// - An error if either of the above criteria are not met
+func MaximumChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.Maximum = nil
+		diff.New.Maximum = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.Maximum == nil && diff.New.Maximum != nil:
+		m := *diff.New.Maximum
+		return handled(), fmt.Errorf("maximum constraint added when one did not exist previously: %+v", m)
+	case diff.Old.Maximum != nil && diff.New.Maximum != nil:
+		oldMax := *diff.Old.Maximum
+		newMax := *diff.New.Maximum
+		if newMax < oldMax {
+			return handled(), fmt.Errorf("maximum constraint decreased from %+v to %+v", oldMax, newMax)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MaximumLengthChangeValidation adds a validation check to ensure that
+// existing fields can have their maximum length constraints updated in a CRD schema
+// based on the following:
+// - No maximum length constraint can be added if one did not exist previously
+// - Maximum length constraints can not decrease in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to maximum length constraints)
+// - An error if either of the above criteria are not met
+func MaximumLengthChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MaxLength = nil
+		diff.New.MaxLength = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MaxLength == nil && diff.New.MaxLength != nil:
+		m := *diff.New.MaxLength
+		return handled(), fmt.Errorf("maximum length constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MaxLength != nil && diff.New.MaxLength != nil:
+		oldMax := *diff.Old.MaxLength
+		newMax := *diff.New.MaxLength
+		if newMax < oldMax {
+			return handled(), fmt.Errorf("maximum length constraint decreased from %+v to %+v", oldMax, newMax)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MaximumItemsChangeValidation adds a validation check to ensure that
+// existing fields can have their maximum item constraints updated in a CRD schema
+// based on the following:
+// - No maximum item constraint can be added if one did not exist previously
+// - Maximum item constraints can not decrease in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to maximum item constraints)
+// - An error if either of the above criteria are not met
+func MaximumItemsChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MaxItems = nil
+		diff.New.MaxItems = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MaxItems == nil && diff.New.MaxItems != nil:
+		m := *diff.New.MaxItems
+		return handled(), fmt.Errorf("maximum items constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MaxItems != nil && diff.New.MaxItems != nil:
+		oldMax := *diff.Old.MaxItems
+		newMax := *diff.New.MaxItems
+		if newMax < oldMax {
+			return handled(), fmt.Errorf("maximum items constraint decreased from %+v to %+v", oldMax, newMax)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
+// MaximumPropertiesChangeValidation adds a validation check to ensure that
+// existing fields can have their maximum properties constraints updated in a CRD schema
+// based on the following:
+// - No maximum properties constraint can be added if one did not exist previously
+// - Maximum properties constraints can not increase in value
+// This function returns:
+// - A boolean representation of whether or not the change
+// has been fully handled (i.e. the only change was to maximum properties constraints)
+// - An error if either of the above criteria are not met
+func MaximumPropertiesChangeValidation(diff FieldDiff) (bool, error) {
+	handled := func() bool {
+		diff.Old.MaxProperties = nil
+		diff.New.MaxProperties = nil
+		return reflect.DeepEqual(diff.Old, diff.New)
+	}
+
+	switch {
+	case diff.Old.MaxProperties == nil && diff.New.MaxProperties != nil:
+		m := *diff.New.MaxProperties
+		return handled(), fmt.Errorf("maximum properties constraint added when one did not exist previously: %+v", m)
+	case diff.Old.MaxProperties != nil && diff.New.MaxProperties != nil:
+		oldMax := *diff.Old.MaxProperties
+		newMax := *diff.New.MaxProperties
+		if newMax < oldMax {
+			return handled(), fmt.Errorf("maximum properties constraint decreased from %+v to %+v", oldMax, newMax)
+		}
+		fallthrough
+	default:
+		return handled(), nil
+	}
+}
+
 // ChangeValidator is a Validation implementation focused on
 // handling updates to existing fields in a CRD
 type ChangeValidator struct {
