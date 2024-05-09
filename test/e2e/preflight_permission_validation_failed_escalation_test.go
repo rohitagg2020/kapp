@@ -114,6 +114,34 @@ rules:
 		NewMissingClusterResource(t, "role", testName, testName, kubectl)
 	})
 
+	roleResourceSSRR := `
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+preflightRules:
+- name: PermissionValidation
+  config:
+    permissionValidatorResource: SelfSubjectRulesReview
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: __test-name__
+  name: __test-name__
+rules:
+- apiGroups: [""]
+  resources: ["secrets"]
+  verbs: ["*"]
+`
+
+	roleResourceSSRR = strings.ReplaceAll(roleResourceSSRR, "__test-name__", testName)
+	logger.Section("attempt to deploy app with privilege escalation Role without privilege escalation permissions using SSRR validation", func() {
+		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
+			RunOpts{StdinReader: strings.NewReader(roleResourceSSRR), AllowError: true})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": potential privilege escalation, not permitted to \"create\" rbac.authorization.k8s.io/v1, Kind=Role")
+		NewMissingClusterResource(t, "role", testName, testName, kubectl)
+	})
+
 	bindingResource := `
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -134,6 +162,37 @@ roleRef:
 	logger.Section("attempt deploy app with privilege escalation RoleBinding without privilege escalation permissions", func() {
 		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
 			RunOpts{StdinReader: strings.NewReader(bindingResource), AllowError: true})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": potential privilege escalation, not permitted to \"create\" rbac.authorization.k8s.io/v1, Kind=RoleBinding")
+		NewMissingClusterResource(t, "rolebinding", testName, testName, kubectl)
+	})
+
+	bindingResourceSSRR := `
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+preflightRules:
+- name: PermissionValidation
+  config:
+    permissionValidatorResource: SelfSubjectRulesReview
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: __test-name__
+  name: __test-name__
+subjects:
+  - kind: ServiceAccount
+    namespace: __test-name__
+    name: default
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+`
+	bindingResourceSSRR = strings.ReplaceAll(bindingResourceSSRR, "__test-name__", testName)
+	logger.Section("attempt deploy app with privilege escalation RoleBinding without privilege escalation permissions using SSRR validation", func() {
+		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
+			RunOpts{StdinReader: strings.NewReader(bindingResourceSSRR), AllowError: true})
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": potential privilege escalation, not permitted to \"create\" rbac.authorization.k8s.io/v1, Kind=RoleBinding")
 		NewMissingClusterResource(t, "rolebinding", testName, testName, kubectl)

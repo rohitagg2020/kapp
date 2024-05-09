@@ -12,7 +12,6 @@ import (
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
 	"k8s.io/component-helpers/auth/rbac/validation"
 )
@@ -21,18 +20,18 @@ import (
 // for validating permissions required to CRUD
 // Kubernetes (Cluster)RoleBinding resources
 type BindingValidator struct {
-	ssarClient authv1client.SelfSubjectAccessReviewInterface
-	rbacClient rbacv1client.RbacV1Interface
-	mapper     meta.RESTMapper
+	permissionValidator PermissionValidator
+	rbacClient          rbacv1client.RbacV1Interface
+	mapper              meta.RESTMapper
 }
 
 var _ Validator = (*BindingValidator)(nil)
 
-func NewBindingValidator(ssarClient authv1client.SelfSubjectAccessReviewInterface, rbacClient rbacv1client.RbacV1Interface, mapper meta.RESTMapper) *BindingValidator {
+func NewBindingValidator(pv PermissionValidator, rbacClient rbacv1client.RbacV1Interface, mapper meta.RESTMapper) *BindingValidator {
 	return &BindingValidator{
-		rbacClient: rbacClient,
-		ssarClient: ssarClient,
-		mapper:     mapper,
+		rbacClient:          rbacClient,
+		permissionValidator: pv,
+		mapper:              mapper,
 	}
 }
 
@@ -47,7 +46,7 @@ func (bv *BindingValidator) Validate(ctx context.Context, res ctlres.Resource, v
 		// do early validation on create / update to see if a user has
 		// the "bind" permissions which allows them to perform
 		// privilege escalation and create any (Cluster)Role
-		err := ValidatePermissions(ctx, bv.ssarClient, &authv1.ResourceAttributes{
+		err := bv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,
@@ -63,7 +62,7 @@ func (bv *BindingValidator) Validate(ctx context.Context, res ctlres.Resource, v
 		}
 
 		// Check if user has permissions to even create/update the resource
-		err = ValidatePermissions(ctx, bv.ssarClient, &authv1.ResourceAttributes{
+		err = bv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,
@@ -98,7 +97,7 @@ func (bv *BindingValidator) Validate(ctx context.Context, res ctlres.Resource, v
 				if len(subrule.ResourceNames) > 0 {
 					resourceName = subrule.ResourceNames[0]
 				}
-				err := ValidatePermissions(ctx, bv.ssarClient, &authv1.ResourceAttributes{
+				err := bv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 					Group:     subrule.APIGroups[0],
 					Resource:  subrule.Resources[0],
 					Namespace: res.Namespace(),
@@ -116,7 +115,7 @@ func (bv *BindingValidator) Validate(ctx context.Context, res ctlres.Resource, v
 			return errors.Join(append([]error{baseErr}, errorSet...)...)
 		}
 	default:
-		return ValidatePermissions(ctx, bv.ssarClient, &authv1.ResourceAttributes{
+		return bv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,

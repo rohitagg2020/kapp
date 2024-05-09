@@ -7,33 +7,50 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"sync"
 
 	ctlres "carvel.dev/kapp/pkg/kapp/resources"
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	v1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/apimachinery/pkg/runtime/schema"
+	"k8s.io/apiserver/pkg/authorization/authorizer"
 	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	rbacv1client "k8s.io/client-go/kubernetes/typed/rbac/v1"
+	rbacauthorizer "k8s.io/kubernetes/plugin/pkg/auth/authorizer/rbac"
 )
 
 type Validator interface {
 	Validate(context.Context, ctlres.Resource, string) error
 }
 
-// ValidatePermissons takes in all the parameters necessary to validate permissions using a
-// SelfSubjectAccessReview. It returns an error if the SelfSubjectAccessReview indicates that
-// the permissions are not present or are unable to be determined. A nil error is returned if
-// the SelfSubjectAccessReview indicates that the permissions are present.
-// TODO: Look into using SelfSubjectRulesReview instead of SelfSubjectAccessReview
-func ValidatePermissions(ctx context.Context, ssarClient authv1client.SelfSubjectAccessReviewInterface, resourceAttributes *authv1.ResourceAttributes) error {
+type PermissionValidator interface {
+	ValidatePermissions(context.Context, *authv1.ResourceAttributes) error
+}
+
+// SelfSubjectAccessReviewValidator is for validating permissions via SelfSubjectAccessReview
+type SelfSubjectAccessReviewValidator struct {
+	ssarClient authv1client.SelfSubjectAccessReviewInterface
+}
+
+func NewSelfSubjectAccessReviewValidator(ssarClient authv1client.SelfSubjectAccessReviewInterface) *SelfSubjectAccessReviewValidator {
+	return &SelfSubjectAccessReviewValidator{
+		ssarClient: ssarClient,
+	}
+}
+
+// ValidatePermissons will validate permissions for a ResourceAttributes object using SelfSubjectAccessReview.
+// An error is returned if there are any issues creating a SelfSubjectAccessReview (i.e can't determine permissions)
+// or if the SelfSubjectAccessReview is evaluated and the caller does not have the permission to perform the actions
+// identified in the provided ResourceAttributes.
+func (rv *SelfSubjectAccessReviewValidator) ValidatePermissions(ctx context.Context, resourceAttrib *authv1.ResourceAttributes) error {
 	ssar := &authv1.SelfSubjectAccessReview{
 		Spec: authv1.SelfSubjectAccessReviewSpec{
-			ResourceAttributes: resourceAttributes,
+			ResourceAttributes: resourceAttrib,
 		},
 	}
 
-	retSsar, err := ssarClient.Create(ctx, ssar, v1.CreateOptions{})
+	retSsar, err := rv.ssarClient.Create(ctx, ssar, v1.CreateOptions{})
 	if err != nil {
 		return err
 	}
@@ -48,15 +65,101 @@ func ValidatePermissions(ctx context.Context, ssarClient authv1client.SelfSubjec
 
 	if !retSsar.Status.Allowed {
 		gvr := schema.GroupVersionResource{
-			Group:    resourceAttributes.Group,
-			Version:  resourceAttributes.Version,
-			Resource: resourceAttributes.Resource,
+			Group:    resourceAttrib.Group,
+			Version:  resourceAttrib.Version,
+			Resource: resourceAttrib.Resource,
 		}
 		return fmt.Errorf("not permitted to %q %s",
-			resourceAttributes.Verb,
+			resourceAttrib.Verb,
 			gvr.String())
 	}
 
+	return nil
+}
+
+// SelfSubjectRulesReviewValidator is for validating permissions via SelfSubjectRulesReview
+type SelfSubjectRulesReviewValidator struct {
+	ssrrClient authv1client.SelfSubjectRulesReviewInterface
+	cache      map[string][]rbacv1.PolicyRule
+	mu         sync.Mutex
+}
+
+func NewSelfSubjectRulesReviewValidator(ssrrClient authv1client.SelfSubjectRulesReviewInterface) *SelfSubjectRulesReviewValidator {
+	return &SelfSubjectRulesReviewValidator{
+		ssrrClient: ssrrClient,
+		cache:      make(map[string][]rbacv1.PolicyRule),
+		mu:         sync.Mutex{},
+	}
+}
+
+// ValidatePermissons will validate permissions for a ResourceAttributes object using SelfSubjectRulesReview.
+// An error is returned if there are any issues creating a SelfSubjectRulesReview (i.e can't determine permissions)
+// or if the SelfSubjectRulesReview is evaluated and the caller does not have the permission to perform the actions
+// identified in the provided ResourceAttributes.
+func (rv *SelfSubjectRulesReviewValidator) ValidatePermissions(ctx context.Context, resourceAttrib *authv1.ResourceAttributes) error {
+	rv.mu.Lock()
+	defer rv.mu.Unlock()
+
+	ns := resourceAttrib.Namespace
+	if ns == "" {
+		ns = "default"
+	}
+
+	if _, ok := rv.cache[ns]; !ok {
+		rules := []rbacv1.PolicyRule{}
+		ssrr, err := rv.ssrrClient.Create(ctx,
+			&authv1.SelfSubjectRulesReview{
+				Spec: authv1.SelfSubjectRulesReviewSpec{
+					Namespace: ns,
+				},
+			},
+			v1.CreateOptions{},
+		)
+		if err != nil {
+			return fmt.Errorf("creating selfsubjectrulesreview: %w", err)
+		}
+		if ssrr.Status.Incomplete {
+			return errors.New("selfsubjectrulesreview is incomplete")
+		}
+
+		for _, rule := range ssrr.Status.ResourceRules {
+			rules = append(rules, rbacv1.PolicyRule{
+				Verbs:         rule.Verbs,
+				APIGroups:     rule.APIGroups,
+				Resources:     rule.Resources,
+				ResourceNames: rule.ResourceNames,
+			})
+		}
+
+		for _, rule := range ssrr.Status.NonResourceRules {
+			rules = append(rules, rbacv1.PolicyRule{
+				Verbs:           rule.Verbs,
+				NonResourceURLs: rule.NonResourceURLs,
+			})
+		}
+
+		rv.cache[ns] = rules
+	}
+
+	rules := rv.cache[ns]
+
+	if !rbacauthorizer.RulesAllow(authorizer.AttributesRecord{
+		Verb:            resourceAttrib.Verb,
+		Name:            resourceAttrib.Name,
+		Namespace:       resourceAttrib.Namespace,
+		Resource:        resourceAttrib.Resource,
+		APIGroup:        resourceAttrib.Group,
+		ResourceRequest: true,
+	}, rules...) {
+		gvr := schema.GroupVersionResource{
+			Group:    resourceAttrib.Group,
+			Version:  resourceAttrib.Version,
+			Resource: resourceAttrib.Resource,
+		}
+		return fmt.Errorf("not permitted to %q %s",
+			resourceAttrib.Verb,
+			gvr.String())
+	}
 	return nil
 }
 

@@ -5,7 +5,9 @@ package permissions
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
 
 	cmdcore "carvel.dev/kapp/pkg/kapp/cmd/core"
 	ctldgraph "carvel.dev/kapp/pkg/kapp/diffgraph"
@@ -20,12 +22,25 @@ import (
 type Preflight struct {
 	depsFactory cmdcore.DepsFactory
 	enabled     bool
+	config      *PreflightConfig
+}
+
+const (
+	PermissionValidatorTypeSelfSubjectAccessReview = "SelfSubjectAccessReview"
+	PermissionValidatorTypeSelfSubjectRulesReview  = "SelfSubjectRulesReview"
+)
+
+type PreflightConfig struct {
+	PermissionValidatorResource string `json:"permissionValidatorResource"`
 }
 
 func NewPreflight(depsFactory cmdcore.DepsFactory, enabled bool) preflight.Check {
 	return &Preflight{
 		depsFactory: depsFactory,
 		enabled:     enabled,
+		config: &PreflightConfig{
+			PermissionValidatorResource: PermissionValidatorTypeSelfSubjectAccessReview,
+		},
 	}
 }
 
@@ -37,7 +52,27 @@ func (p *Preflight) SetEnabled(enabled bool) {
 	p.enabled = enabled
 }
 
-func (p *Preflight) SetConfig(_ preflight.CheckConfig) error {
+func (p *Preflight) SetConfig(cfg preflight.CheckConfig) error {
+	pCfg := &PreflightConfig{}
+	cfgBytes, err := json.Marshal(cfg)
+	if err != nil {
+		return fmt.Errorf("converting CheckConfig to bytes: %w", err)
+	}
+
+	err = json.Unmarshal(cfgBytes, pCfg)
+	if err != nil {
+		return fmt.Errorf("parsing permissions preflight config: %w", err)
+	}
+
+	switch pCfg.PermissionValidatorResource {
+	// Valid, do nothing
+	case PermissionValidatorTypeSelfSubjectAccessReview, PermissionValidatorTypeSelfSubjectRulesReview:
+	// Default to using SelfSubjectAccessReview
+	case "":
+		pCfg.PermissionValidatorResource = PermissionValidatorTypeSelfSubjectAccessReview
+	default:
+		return fmt.Errorf("unknown permissionValidatorType %q", pCfg.PermissionValidatorResource)
+	}
 	return nil
 }
 
@@ -52,9 +87,17 @@ func (p *Preflight) Run(ctx context.Context, changeGraph *ctldgraph.ChangeGraph)
 		return err
 	}
 
-	roleValidator := NewRoleValidator(client.AuthorizationV1().SelfSubjectAccessReviews(), mapper)
-	bindingValidator := NewBindingValidator(client.AuthorizationV1().SelfSubjectAccessReviews(), client.RbacV1(), mapper)
-	basicValidator := NewBasicValidator(client.AuthorizationV1().SelfSubjectAccessReviews(), mapper)
+	var permissionValidator PermissionValidator
+	switch p.config.PermissionValidatorResource {
+	case PermissionValidatorTypeSelfSubjectAccessReview:
+		permissionValidator = NewSelfSubjectAccessReviewValidator(client.AuthorizationV1().SelfSubjectAccessReviews())
+	case PermissionValidatorTypeSelfSubjectRulesReview:
+		permissionValidator = NewSelfSubjectRulesReviewValidator(client.AuthorizationV1().SelfSubjectRulesReviews())
+	}
+
+	roleValidator := NewRoleValidator(permissionValidator, mapper)
+	bindingValidator := NewBindingValidator(permissionValidator, client.RbacV1(), mapper)
+	basicValidator := NewBasicValidator(permissionValidator, mapper)
 
 	validator := NewCompositeValidator(basicValidator, map[schema.GroupVersionKind]Validator{
 		rbacv1.SchemeGroupVersion.WithKind("Role"):               roleValidator,

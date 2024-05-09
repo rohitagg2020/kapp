@@ -12,7 +12,6 @@ import (
 	authv1 "k8s.io/api/authorization/v1"
 	rbacv1 "k8s.io/api/rbac/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 	"k8s.io/component-helpers/auth/rbac/validation"
 )
 
@@ -20,16 +19,16 @@ import (
 // for validating permissions required to CRUD
 // Kubernetes (Cluster)Role resources
 type RoleValidator struct {
-	ssarClient authv1client.SelfSubjectAccessReviewInterface
-	mapper     meta.RESTMapper
+	permissionValidator PermissionValidator
+	mapper              meta.RESTMapper
 }
 
 var _ Validator = (*RoleValidator)(nil)
 
-func NewRoleValidator(ssarClient authv1client.SelfSubjectAccessReviewInterface, mapper meta.RESTMapper) *RoleValidator {
+func NewRoleValidator(pv PermissionValidator, mapper meta.RESTMapper) *RoleValidator {
 	return &RoleValidator{
-		ssarClient: ssarClient,
-		mapper:     mapper,
+		permissionValidator: pv,
+		mapper:              mapper,
 	}
 }
 
@@ -44,7 +43,7 @@ func (rv *RoleValidator) Validate(ctx context.Context, res ctlres.Resource, verb
 		// do early validation on create / update to see if a user has
 		// the "escalate" permissions which allows them to perform
 		// privilege escalation and create any (Cluster)Role
-		err := ValidatePermissions(ctx, rv.ssarClient, &authv1.ResourceAttributes{
+		err := rv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,
@@ -60,7 +59,7 @@ func (rv *RoleValidator) Validate(ctx context.Context, res ctlres.Resource, verb
 		}
 
 		// Check if user has permissions to even create/update the resource
-		err = ValidatePermissions(ctx, rv.ssarClient, &authv1.ResourceAttributes{
+		err = rv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,
@@ -92,7 +91,7 @@ func (rv *RoleValidator) Validate(ctx context.Context, res ctlres.Resource, verb
 				if len(subrule.ResourceNames) > 0 {
 					resourceName = subrule.ResourceNames[0]
 				}
-				err := ValidatePermissions(ctx, rv.ssarClient, &authv1.ResourceAttributes{
+				err := rv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 					Group:     subrule.APIGroups[0],
 					Resource:  subrule.Resources[0],
 					Namespace: res.Namespace(),
@@ -110,7 +109,7 @@ func (rv *RoleValidator) Validate(ctx context.Context, res ctlres.Resource, verb
 			return errors.Join(append([]error{baseErr}, errorSet...)...)
 		}
 	default:
-		return ValidatePermissions(ctx, rv.ssarClient, &authv1.ResourceAttributes{
+		return rv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 			Group:     mapping.Resource.Group,
 			Version:   mapping.Resource.Version,
 			Resource:  mapping.Resource.Resource,

@@ -9,7 +9,6 @@ import (
 	ctlres "carvel.dev/kapp/pkg/kapp/resources"
 	authv1 "k8s.io/api/authorization/v1"
 	"k8s.io/apimachinery/pkg/api/meta"
-	authv1client "k8s.io/client-go/kubernetes/typed/authorization/v1"
 )
 
 // BasicValidator is a basic validator useful for
@@ -17,16 +16,16 @@ import (
 // of how to handle permission evaluation for specific
 // GroupVersionKinds
 type BasicValidator struct {
-	ssarClient authv1client.SelfSubjectAccessReviewInterface
-	mapper     meta.RESTMapper
+	permissionValidator PermissionValidator
+	mapper              meta.RESTMapper
 }
 
 var _ Validator = (*BasicValidator)(nil)
 
-func NewBasicValidator(ssarClient authv1client.SelfSubjectAccessReviewInterface, mapper meta.RESTMapper) *BasicValidator {
+func NewBasicValidator(pv PermissionValidator, mapper meta.RESTMapper) *BasicValidator {
 	return &BasicValidator{
-		ssarClient: ssarClient,
-		mapper:     mapper,
+		permissionValidator: pv,
+		mapper:              mapper,
 	}
 }
 
@@ -36,7 +35,7 @@ func (bv *BasicValidator) Validate(ctx context.Context, res ctlres.Resource, ver
 		return err
 	}
 
-	return ValidatePermissions(ctx, bv.ssarClient, &authv1.ResourceAttributes{
+	return bv.permissionValidator.ValidatePermissions(ctx, &authv1.ResourceAttributes{
 		Group:     mapping.Resource.Group,
 		Version:   mapping.Resource.Version,
 		Resource:  mapping.Resource.Resource,

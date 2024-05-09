@@ -117,6 +117,37 @@ spec:
 		NewMissingClusterResource(t, "pod", testName, testName, kubectl)
 	})
 
+	basicResourceSSRR := `
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+preflightRules:
+- name: PermissionValidation
+  config:
+    permissionValidatorResource: SelfSubjectRulesReview
+---
+apiVersion: v1
+kind: Pod
+metadata:
+  name: __test-name__
+  namespace: __test-name__
+spec:
+  containers:
+  - name: simple-app
+    image: docker.io/dkalinin/k8s-simple-app@sha256:4c8b96d4fffdfae29258d94a22ae4ad1fe36139d47288b8960d9958d1e63a9d0
+    env:
+    - name: HELLO_MSG
+      value: stranger
+`
+	basicResourceSSRR = strings.ReplaceAll(basicResourceSSRR, "__test-name__", testName)
+	logger.Section("attempt to deploy app with a Pod and missing permissions to create Pods using SSRR for validation", func() {
+		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
+			RunOpts{StdinReader: strings.NewReader(basicResourceSSRR), AllowError: true})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": not permitted to \"create\" /v1, Resource=pods")
+		NewMissingClusterResource(t, "pod", testName, testName, kubectl)
+	})
+
 	roleResource := `
 ---
 apiVersion: rbac.authorization.k8s.io/v1
@@ -134,6 +165,35 @@ rules:
 	logger.Section("attempt to deploy app with a Role and missing permissions to create Roles", func() {
 		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
 			RunOpts{StdinReader: strings.NewReader(roleResource), AllowError: true})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": not permitted to \"create\" rbac.authorization.k8s.io/v1, Resource=roles")
+		NewMissingClusterResource(t, "role", testName, testName, kubectl)
+	})
+
+	roleResourceSSRR := `
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+preflightRules:
+- name: PermissionValidation
+  config:
+    permissionValidatorResource: SelfSubjectRulesReview
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  namespace: __test-name__
+  name: __test-name__
+rules:
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["create", "update", "delete"]
+`
+
+	roleResourceSSRR = strings.ReplaceAll(roleResourceSSRR, "__test-name__", testName)
+	logger.Section("attempt to deploy app with a Role and missing permissions to create Roles using SSRR for validation", func() {
+		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
+			RunOpts{StdinReader: strings.NewReader(roleResourceSSRR), AllowError: true})
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": not permitted to \"create\" rbac.authorization.k8s.io/v1, Resource=roles")
@@ -160,6 +220,38 @@ roleRef:
 	logger.Section("attempt to deploy app with a RoleBinding and missing permissions to create RoleBindings", func() {
 		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
 			RunOpts{StdinReader: strings.NewReader(bindingResource), AllowError: true})
+
+		require.Error(t, err)
+		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": not permitted to \"create\" rbac.authorization.k8s.io/v1, Resource=rolebindings")
+		NewMissingClusterResource(t, "rolebinding", testName, testName, kubectl)
+	})
+
+	bindingResourceSSRR := `
+apiVersion: kapp.k14s.io/v1alpha1
+kind: Config
+preflightRules:
+- name: PermissionValidation
+  config:
+    permissionValidatorResource: SelfSubjectRulesReview
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  namespace: __test-name__
+  name: __test-name__
+subjects:
+  - kind: ServiceAccount
+    namespace: __test-name__
+    name: default
+roleRef:
+  kind: ClusterRole
+  name: admin
+  apiGroup: rbac.authorization.k8s.io
+`
+	bindingResourceSSRR = strings.ReplaceAll(bindingResourceSSRR, "__test-name__", testName)
+	logger.Section("attempt to deploy app with a RoleBinding and missing permissions to create RoleBindings using SSRR validation", func() {
+		_, err := kapp.RunWithOpts([]string{"deploy", "--preflight=PermissionValidation", "-a", appName, "-f", "-", fmt.Sprintf("--kubeconfig-context=%s", scopedContext)},
+			RunOpts{StdinReader: strings.NewReader(bindingResourceSSRR), AllowError: true})
 
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "running preflight check \"PermissionValidation\": not permitted to \"create\" rbac.authorization.k8s.io/v1, Resource=rolebindings")
