@@ -382,15 +382,27 @@ func (o *DeployOptions) existingResources(newResources []ctlres.Resource,
 		return ""
 	}
 
+	labelValAppMapResolver := func() map[string]string {
+		items, _ := apps.List(nil)
+		appLabelMap := map[string]string{}
+		for _, item := range items {
+			meta, _ := item.Meta()
+			appLabelMap[meta.LabelValue] = item.Name()
+		}
+		return appLabelMap
+	}
+
 	matchingOpts := ctlres.AllAndMatchingOpts{
 		ExistingNonLabeledResourcesCheck:            o.DeployFlags.ExistingNonLabeledResourcesCheck,
 		ExistingNonLabeledResourcesCheckConcurrency: o.DeployFlags.ExistingNonLabeledResourcesCheckConcurrency,
 		SkipResourceOwnershipCheck:                  o.DeployFlags.OverrideOwnershipOfExistingResources,
+		SkipOwnershipCheckAllowedApps:               o.DeployFlags.OwnershipOverrideAllowedApps,
 		IsNewApp:                                    isNewApp,
 
 		// Prevent accidently overriding kapp state records
 		DisallowedResourcesByLabelKeys: []string{ctlapp.KappIsAppLabelKey},
 		LabelErrorResolutionFunc:       labelErrorResolutionFunc,
+		LabelValAppMapResolverFunc:     labelValAppMapResolver,
 
 		//Scope resource searching to UsedGKs
 		IdentifiedResourcesListOpts: ctlres.IdentifiedResourcesListOpts{

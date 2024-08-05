@@ -23,6 +23,7 @@ var (
 		ExactMatch: []string{
 			"dangerous-allow-empty-list-of-resources",
 			"dangerous-override-ownership-of-existing-resources",
+			"ownership-override-allowed-apps",
 		},
 	}
 	WaitFlagGroup = cobrautil.FlagHelpSection{
