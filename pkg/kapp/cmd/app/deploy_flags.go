@@ -49,8 +49,8 @@ func (s *DeployFlags) Set(cmd *cobra.Command) {
 		100, "Concurrency to check for existing non-labeled resources")
 	cmd.Flags().BoolVar(&s.OverrideOwnershipOfExistingResources, "dangerous-override-ownership-of-existing-resources",
 		false, "Steal existing resources from another app")
-	cmd.Flags().StringSliceVar(&s.OwnershipOverrideAllowedApps, "ownership-override-allowed-apps", nil,
-		"Specify existing apps in the same namespace that existing resources can be stolen from if --dangerous-override-ownership-of-existing-resources is set")
+	cmd.Flags().StringSliceVar(&s.OwnershipOverrideAllowedApps, "dangerous-ownership-override-allowed-apps", nil,
+		"Specify existing apps in the same namespace that existing resources can be stolen from")
 
 	cmd.Flags().BoolVar(&s.DefaultLabelScopingRules, "default-label-scoping-rules",
 		true, "Use default label scoping rules")

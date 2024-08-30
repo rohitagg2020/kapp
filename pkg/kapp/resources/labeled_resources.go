@@ -134,8 +134,7 @@ func (a *LabeledResources) AllAndMatching(newResources []Resource, opts AllAndMa
 		}
 	}
 
-	if len(nonLabeledResources) > 0 && (!opts.SkipResourceOwnershipCheck ||
-		(opts.SkipResourceOwnershipCheck && len(opts.SkipOwnershipCheckAllowedApps) > 0)) {
+	if len(nonLabeledResources) > 0 && !opts.SkipResourceOwnershipCheck {
 		resourcesForCheck := a.resourcesForOwnershipCheck(newResources, nonLabeledResources)
 		if len(resourcesForCheck) > 0 {
 			err := a.checkResourceOwnership(resourcesForCheck, opts)
@@ -185,14 +184,16 @@ func (a *LabeledResources) checkResourceOwnership(resources []Resource, opts All
 
 	var errs []error
 	labelValAppMap := map[string]string{}
-	if len(opts.SkipOwnershipCheckAllowedApps) > 0 && opts.SkipResourceOwnershipCheck {
+	isSelectiveOwnershipOverride := len(opts.SkipOwnershipCheckAllowedApps) > 0
+	if isSelectiveOwnershipOverride {
 		labelValAppMap = opts.LabelValAppMapResolverFunc()
 	}
 
 	for _, res := range resources {
 		if val, found := res.Labels()[expectedLabelKey]; found {
 			ownershipOverrideAllowed := false
-			if opts.SkipResourceOwnershipCheck {
+
+			if isSelectiveOwnershipOverride {
 				ownershipOverrideAllowed = a.ownershipOverrideAllowed(labelValAppMap, res,
 					expectedLabelKey, opts.SkipOwnershipCheckAllowedApps)
 			}

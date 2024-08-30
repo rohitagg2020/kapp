@@ -11,6 +11,48 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestOwnershipOverride(t *testing.T) {
+	env := BuildEnv(t)
+	logger := Logger{}
+	kapp := Kapp{t, env.Namespace, env.KappBinaryPath, logger}
+
+	const existingAppName = "existing-app"
+	const newAppName = "new-app"
+
+	resourceYAML := `
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: cm-%s
+data:
+  foo: bar
+`
+
+	cleanUp := func() {
+		kapp.Run([]string{"delete", "-a", existingAppName})
+		kapp.Run([]string{"delete", "-a", newAppName})
+	}
+	cleanUp()
+	defer cleanUp()
+
+	logger.Section("deploy existing app", func() {
+		kapp.RunWithOpts([]string{"deploy", "-a", existingAppName, "-f", "-"}, RunOpts{StdinReader: strings.NewReader(fmt.Sprintf(resourceYAML, "1"))})
+	})
+
+	logger.Section("deploy new app with ownership overrides", func() {
+		resourcesString := fmt.Sprintf("%s", fmt.Sprintf(resourceYAML, "1"))
+		// Check for ownership errors without flag
+		_, err := kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-"}, RunOpts{StdinReader: strings.NewReader(resourcesString), AllowError: true})
+		require.Error(t, err)
+		require.Contains(t, err.Error(), existingAppName)
+
+		// Check for successful ownership override
+		kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--dangerous-override-ownership-of-existing-resources"},
+			RunOpts{StdinReader: strings.NewReader(resourcesString)})
+	})
+}
+
 func TestSelectiveOwnershipOverride(t *testing.T) {
 	env := BuildEnv(t)
 	logger := Logger{}
@@ -51,22 +93,15 @@ data:
 		require.Contains(t, err.Error(), existingAppName1)
 		require.Contains(t, err.Error(), existingAppName2)
 
-		// Test with override scoped while override is disallowed
-		_, err = kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--ownership-override-allowed-apps", existingAppName1},
-			RunOpts{StdinReader: strings.NewReader(resourcesString), AllowError: true})
-		require.Error(t, err)
-		require.Contains(t, err.Error(), existingAppName1)
-		require.Contains(t, err.Error(), existingAppName2)
-
 		// Test with override scoped to single existing app
-		_, err = kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--dangerous-override-ownership-of-existing-resources", "--ownership-override-allowed-apps", existingAppName1},
+		_, err = kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--dangerous-ownership-override-allowed-apps", existingAppName1},
 			RunOpts{StdinReader: strings.NewReader(resourcesString), AllowError: true})
 		require.Error(t, err)
 		require.NotContains(t, err.Error(), existingAppName1)
 		require.Contains(t, err.Error(), existingAppName2)
 
 		// Test with override scoped to both existing app
-		kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--dangerous-override-ownership-of-existing-resources", "--ownership-override-allowed-apps", fmt.Sprintf("%s,%s", existingAppName1, existingAppName2)},
+		kapp.RunWithOpts([]string{"deploy", "-a", newAppName, "-f", "-", "--dangerous-ownership-override-allowed-apps", fmt.Sprintf("%s,%s", existingAppName1, existingAppName2)},
 			RunOpts{StdinReader: strings.NewReader(resourcesString)})
 	})
 }
