@@ -131,6 +131,7 @@ func (s CustomWaitingResource) IsDoneApplying() DoneApplyState {
 	}
 
 	unblockChangeMsg := ""
+	message := "No failing or successful conditions found"
 
 	// If no failure conditions found, check on successful ones
 	for _, condMatcher := range s.waitRule.ConditionMatchers {
@@ -151,6 +152,9 @@ func (s CustomWaitingResource) IsDoneApplying() DoneApplyState {
 						cond.Type, condMatcher.Status, cond.Reason)
 					continue
 				}
+				if cond.Message != "" {
+					message = cond.Message
+				}
 			}
 		}
 	}
@@ -164,7 +168,7 @@ func (s CustomWaitingResource) IsDoneApplying() DoneApplyState {
 		return DoneApplyState{Done: false, UnblockChanges: true, Message: unblockChangeMsg}
 	}
 
-	return DoneApplyState{Done: false, Message: "No failing or successful conditions found"}
+	return DoneApplyState{Done: false, Message: message}
 }
 
 func (s CustomWaitingResource) hasTimeoutOccurred(timeout string, key string) bool {
